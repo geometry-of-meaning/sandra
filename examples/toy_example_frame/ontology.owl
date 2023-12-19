@@ -1,0 +1,273 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="https://w3id.org/geometryofmeaning/toy_example_frame/"
+     xml:base="https://w3id.org/geometryofmeaning/toy_example_frame/"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:schema="https://w3id.org/geometryofmeaning/">
+    <owl:Ontology rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/"/>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole -->
+
+    <owl:ObjectProperty rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/optionalRole -->
+
+    <owl:ObjectProperty rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/optionalRole"/>
+    
+
+
+    <!-- 
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Agent -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Agent"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Asset -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Asset" />
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Buyer -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Buyer">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Agent"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Commerce_buy -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Commerce_buy">
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Buyer"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Goods"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Direction -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Direction">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Location"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Distance -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Distance">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Quality"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Entity -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Entity"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Exporting_area -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Exporting_area">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Location"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Goal -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Goal">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Purpose"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Goods -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Goods">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Asset"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Importer -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Importer">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Agent"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Importing -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Importing">
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Exporting_area"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Goods"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Importer"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Importing_area"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/optionalRole"/>
+                <owl:allValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Path"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Importing_area -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Importing_area">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Location"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Location -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Location"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Motion -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Motion">
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Direction"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Distance"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Goal"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/necessaryRole"/>
+                <owl:someValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Source"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/optionalRole"/>
+                <owl:allValuesFrom rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Purpose"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Path -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Path"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Purpose -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Purpose">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Purpose"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Quality -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Quality"/>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Quantity -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Quantity">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Quality"/>
+    </owl:Class>
+    
+
+
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Source -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Source">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Path"/>
+    </owl:Class>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.25.2023-02-15T19:15:49Z) https://github.com/owlcs/owlapi -->
+
