@@ -15,6 +15,7 @@ class Reasoner(object):
         ontology (DescriptionCollection): Collection of components,
           and descriptions used by the reasoner to classify situations.
     """
+    super().__init__()
     self.ontology = ontology
 
     # compute the basis that spans the whole space by constructing
@@ -31,6 +32,15 @@ class Reasoner(object):
     ])
 
   def description_element_idxs(self, d: Description) -> np.array:
+    """
+    Compute the indeces of the bases corresponding to element in the description.
+
+    Args:
+        d (Description): Input description.
+
+    Returns:
+        np.array: Elements' bases
+    """
     idxs = set()
     for e in d.elements:
       idxs.add(self.ontology.elements.index(e))
@@ -49,7 +59,8 @@ class Reasoner(object):
         x (Element): Element x
         y (Element): Element y
     """
-    return 1 if x == y else 0
+    return 1 if x == y or y in x.descendants() else 0
+    #return 1 if x == y else 0
 
   def encode_element(self, e: Element) -> np.array:
     """
@@ -67,7 +78,7 @@ class Reasoner(object):
     
     if type(e) == Description:
       # when encoding a description the basis of each element are also added
-      encoding += np.sum([self.encode_element(c) for c in e.closure], axis=0)
+      encoding += np.sum([self.encode_element(c) for c in e.elements], axis=0)
 
     return encoding
     
@@ -83,7 +94,17 @@ class Reasoner(object):
     Returns:
         np.array: Vector of length (|C| + |D|) representing the encoded situation.
     """
-    return np.sum([self.encode(e) for e in s.components], axis=0)
+    encoding = np.zeros(len(self.ontology.elements))
+
+    for c in s.components:
+      if type(c) is Situation:
+        encoding += self.encode_situation(c)
+      else:
+        c_idx = self.ontology.elements.index(c)
+        encoding[c_idx] = 1
+
+    return encoding
+    #return np.sum([self.encode(e) for e in s.components], axis=0)
 
   def encode(self, x: Union[Situation, Element]) -> np.array:
     """
@@ -119,7 +140,6 @@ class Reasoner(object):
     """
     # turn x into batched if it is not
     x = np.atleast_2d(x)
-    assert not np.allclose(x, 0), "Inferring on an empty situation!"
     
     # normalise x
     x = x / np.linalg.norm(x, axis=-1).reshape(-1, 1)

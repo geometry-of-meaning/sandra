@@ -57,24 +57,24 @@ class Element(object):
            if len(self.children) > 0 \
            else set()
 
-  @property
-  def closure(self) -> List["Element"]:
-    """
-    Returns:
-        List[Element]: Computes the closure of the current element by collecting
-        all the ancestors and the descendants of this element.
-    """
-    closure = set()
+  # @property
+  # def closure(self) -> List["Element"]:
+  #   """
+  #   Returns:
+  #       List[Element]: Computes the closure of the current element by collecting
+  #       all the ancestors and the descendants of this element.
+  #   """
+  #   closure = set()
 
-    if len(self.parents) > 0:
-      closure = closure.union(self.parents)
-      closure = closure.union(*[p.ancestors() for p in self.parents])
+  #   if len(self.parents) > 0:
+  #     closure = closure.union(self.parents)
+  #     closure = closure.union(*[p.ancestors() for p in self.parents])
 
-    if len(self.children) > 0:
-      closure = closure.union(self.children)
-      closure = closure.union(*[c.descendants() for c in self.children])
+  #   if len(self.children) > 0:
+  #     closure = closure.union(self.children)
+  #     closure = closure.union(*[c.descendants() for c in self.children])
 
-    return closure
+  #   return closure
 
 
 class Component(Element):

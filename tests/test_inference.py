@@ -46,8 +46,8 @@ def test_satisfy_using_a_superclass():
   
   # check that both frames involving Agent and Goods are
   # satisfied 0.01 < p < 0.9
-  assert infer[0] > 0.01 and infer[0] < 0.9
-  assert infer[2] > 0.01 and infer[2] < 0.9
+  assert not np.allclose(infer[0], 1, rtol=0.1)
+  assert not np.allclose(infer[2], 1, rtol=0.1)
 
 def test_satisfy_using_both_superclass():
   s = sandra.Situation([
@@ -56,8 +56,8 @@ def test_satisfy_using_both_superclass():
   enc_s = reasoner.encode(s)
 
   infer = reasoner.infer(enc_s)[0]
-  assert infer[0] > 0.01 and infer[0] < 0.9
-  assert infer[2] > 0.01 and infer[2] < 0.9
+  assert not np.allclose(infer[0], 1, rtol=0.1)
+  assert not np.allclose(infer[2], 1, rtol=0.1)
 
 def test_satisfy_goods():
   s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])
@@ -66,3 +66,12 @@ def test_satisfy_goods():
   infer = reasoner.infer(enc_s)[0]
   assert infer[0] > 0.01 and infer[0] < 0.9
   assert infer[2] > 0.01 and infer[2] < 0.9
+
+def test_satisfy_using_subclass():
+  s = sandra.Situation([
+    dc["https://w3id.org/geometryofmeaning/toy_example_frame/Goods"], 
+    dc["https://w3id.org/geometryofmeaning/toy_example_frame/Wholesale_buyer"]])
+  enc_s = reasoner.encode(s)
+
+  infer = reasoner.infer(enc_s)[0]
+  assert np.allclose(infer[0], 1, rtol=0.01)

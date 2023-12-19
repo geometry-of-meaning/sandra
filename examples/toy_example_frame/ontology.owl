@@ -62,6 +62,14 @@
     <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Buyer">
         <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Agent"/>
     </owl:Class>
+
+
+    
+    <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Wholesale_buyer -->
+
+    <owl:Class rdf:about="https://w3id.org/geometryofmeaning/toy_example_frame/Wholesale_buyer">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/geometryofmeaning/toy_example_frame/Buyer"/>
+    </owl:Class>
     
 
 
@@ -133,7 +141,7 @@
             </owl:Restriction>
         </rdfs:subClassOf>
     </owl:Class>
-    
+
 
 
     <!-- https://w3id.org/geometryofmeaning/toy_example_frame/Importer -->

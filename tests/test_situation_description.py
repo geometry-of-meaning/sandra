@@ -13,8 +13,8 @@ def test_load_graph_from_rdflib_graph():
 def test_load_components():
   dc = sandra.DescriptionCollection.from_graph(TOY_EXAMPLE_FRAME_PATH)
   components = [x for x in dc.values() if type(x) is sandra.Component]
-  assert len(components) == 16
-  assert len(dc.components) == 16
+  assert len(components) == 17
+  assert len(dc.components) == 17
   assert components == dc.components
 
 def test_load_components_with_class_name():
