@@ -75,3 +75,10 @@ def test_satisfy_using_subclass():
 
   infer = reasoner.infer(enc_s)[0]
   assert np.allclose(infer[0], 1, rtol=0.01)
+
+def test_description_satisfies_description():
+  s = dc["https://w3id.org/geometryofmeaning/toy_example_frame/Commerce_buy"]
+  enc_s = reasoner.encode(s)
+
+  infer = reasoner.infer(enc_s)[0]
+  assert np.allclose(infer[0], 1, rtol=0.01)

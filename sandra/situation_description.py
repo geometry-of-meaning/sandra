@@ -41,9 +41,16 @@ class Element(object):
     Returns:
         List[Element]: List of ancestors of the current element.
     """
-    return self.parents.union(*[p.ancestors() for p in self.parents]) \
-           if len(self.parents) > 0 \
-           else set()
+    if not hasattr(self, "__cached_ancestors"):
+      ancestors = set()
+      for p in self.parents:
+        if p != self and p not in ancestors:
+          ancestors = ancestors.union(p.ancestors())
+
+      ancestors = ancestors.union(self.parents)
+      self.__cached_ancestors = ancestors
+      
+    return self.__cached_ancestors
 
   def descendants(self) -> List["Element"]:
     """
@@ -53,9 +60,16 @@ class Element(object):
     Returns:
         List[Element]: List of descendants of the current element.
     """
-    return self.children.union(*[p.descendants() for p in self.children]) \
-           if len(self.children) > 0 \
-           else set()
+    if not hasattr(self, "__cached_descendants"):
+      descendants = set()
+      for c in self.children:
+        if c != self and c not in descendants:
+          descendants = descendants.union(c.descendants())
+
+      descendants = descendants.union(self.children)
+      self.__cached_descendants = descendants
+      
+    return self.__cached_descendants
 
   # @property
   # def closure(self) -> List["Element"]:
@@ -292,7 +306,6 @@ class DescriptionCollection(dict):
     {{ ?element a <{description_class}> }}
     
     FILTER (!ISBLANK(?description))
-    FILTER (!ISBLANK(?element))
   }}
   """
 
