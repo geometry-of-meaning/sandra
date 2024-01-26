@@ -45,7 +45,7 @@ class Reasoner(object):
         if type(a) is Description:
           idxs = idxs.union(self.description_element_idxs(a))
     
-    return torch.tensor(list(idxs))
+    return np.array(list(idxs))
 
   def g(self, x: Element, y: Element) -> int:
     """
@@ -133,7 +133,7 @@ class Reasoner(object):
     # by solving the linear system Ab = x where A is the basis of a description,
     # and b is the situation, the solution x contains the coefficients
     # for each element in the description
-    coefficients = torch.abs(self.A.T @ x.T).T
+    coefficients = np.abs(self.A.T @ x.T).T
     satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ self.description_mask.T
     satisfied = satisfied / self.description_card
 
