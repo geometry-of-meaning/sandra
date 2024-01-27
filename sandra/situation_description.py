@@ -33,7 +33,7 @@ class Element(object):
       self.children.add(e)
       e.parents.add(self)
 
-  def ancestors(self) -> List["Element"]:
+  def ancestors(self, visited = set()) -> List["Element"]:
     """
     Compute the parents of the current element up to the most general
     element available in the same hierarchy.
@@ -42,17 +42,17 @@ class Element(object):
         List[Element]: List of ancestors of the current element.
     """
     if not hasattr(self, "__cached_ancestors"):
-      ancestors = set()
+      visited.add(self)
+      ancestors = set(self.parents)
       for p in self.parents:
-        if p != self and p not in ancestors:
-          ancestors = ancestors.union(p.ancestors())
-
-      ancestors = ancestors.union(self.parents)
+        if p not in visited:
+          ancestors = ancestors.union(p.ancestors(visited=visited))
+      
       self.__cached_ancestors = ancestors
       
     return self.__cached_ancestors
 
-  def descendants(self) -> List["Element"]:
+  def descendants(self, visited = set()) -> List["Element"]:
     """
     Compute the children of the current element up to the most specific
     element available in the same hierarchy.
@@ -61,12 +61,12 @@ class Element(object):
         List[Element]: List of descendants of the current element.
     """
     if not hasattr(self, "__cached_descendants"):
-      descendants = set()
+      visited.add(self)
+      descendants = set(self.children)
       for c in self.children:
-        if c != self and c not in descendants:
-          descendants = descendants.union(c.descendants())
+        if c not in visited:
+          descendants = descendants.union(c.descendants(visited=visited))
 
-      descendants = descendants.union(self.children)
       self.__cached_descendants = descendants
       
     return self.__cached_descendants
