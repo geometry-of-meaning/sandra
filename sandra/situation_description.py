@@ -365,7 +365,7 @@ class DescriptionCollection(dict):
 
   @classmethod
   def from_graph(cls, 
-    graph: rdflib.Graph | str, 
+    graph: Union[rdflib.Graph, str], 
     component_class: rdflib.URIRef = rdflib.OWL.Class,
     description_class: rdflib.URIRef = rdflib.OWL.Class) -> "DescriptionCollection":
     """
