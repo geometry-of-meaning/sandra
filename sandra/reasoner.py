@@ -1,10 +1,6 @@
 from typing import List, Union, Tuple
-
-from itertools import chain
 from sandra.situation_description import Description, DescriptionCollection, Situation, Component, Element
-
 import numpy as np
-import warnings
 
 class Reasoner(object):
   def __init__(self, ontology: DescriptionCollection):
@@ -23,13 +19,13 @@ class Reasoner(object):
     self.basis = np.stack([self.encode(e) for e in self.ontology.elements]).T
     self.basis = self.basis / np.linalg.norm(self.basis, axis=0)
 
-    self.description_bases = [
-      self.basis[:, self.description_element_idxs(d)] for d in self.ontology.descriptions
-    ]
+    self.A = np.linalg.inv(self.basis)
 
-    self.num_element_per_descriptions = np.array([
-      len(d.elements) for d in self.ontology.descriptions
-    ])
+    self.description_mask = np.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
+    for d_idx, d in enumerate(self.ontology.descriptions):
+      self.description_mask[d_idx, self.description_element_idxs(d)] = 1
+      
+    self.description_card = self.description_mask.sum(axis=1)
 
   def description_element_idxs(self, d: Description) -> np.array:
     """
@@ -44,6 +40,11 @@ class Reasoner(object):
     idxs = set()
     for e in d.elements:
       idxs.add(self.ontology.elements.index(e))
+
+      for a in e.ancestors():
+        if type(a) is Description:
+          idxs = idxs.union(self.description_element_idxs(a))
+    
     return np.array(list(idxs))
 
   def g(self, x: Element, y: Element) -> int:
@@ -73,13 +74,7 @@ class Reasoner(object):
     Returns:
         np.array: Vector of length (|C| + |D|) representing the encoded component.
     """
-    encoding = np.array([self.g(e, e_i) for e_i in self.ontology.elements])
-    
-    if type(e) == Description:
-      # when encoding a description the basis of each element are also added
-      encoding += np.sum([self.encode_element(c) for c in e.elements], axis=0)
-
-    return encoding
+    return np.array([self.g(e, e_i) for e_i in self.ontology.elements])
     
   def encode_situation(self, s: Situation) -> np.array:
     """
@@ -93,16 +88,7 @@ class Reasoner(object):
     Returns:
         np.array: Vector of length (|C| + |D|) representing the encoded situation.
     """
-    encoding = np.zeros(len(self.ontology.elements))
-
-    for c in s.components:
-      if type(c) is Situation:
-        encoding += self.encode_situation(c)
-      else:
-        c_idx = self.ontology.elements.index(c)
-        encoding[c_idx] = 1
-
-    return encoding
+    return np.stack([self.encode(c) for c in s.components]).sum(axis=0)
 
   def encode(self, x: Union[Situation, Element]) -> np.array:
     """
@@ -124,7 +110,7 @@ class Reasoner(object):
     else:
       raise ValueError(f"{e} is not of type Situation or Description")
 
-  def infer(self, x: np.array) -> np.array:
+  def __call__(self, x: np.array) -> np.array:
     """
     Infer the descriptions that are satisfied by the encoded situation x.
 
@@ -147,28 +133,8 @@ class Reasoner(object):
     # by solving the linear system Ab = x where A is the basis of a description,
     # and b is the situation, the solution x contains the coefficients
     # for each element in the description
-    sat = np.stack([np.array([
-      np.heaviside(np.linalg.lstsq(db, xi, rcond=None)[0], 0).sum() 
-      for db_idx, db in enumerate(self.description_bases)]) / self.num_element_per_descriptions
-      for xi in x])
+    coefficients = np.abs(self.A.T @ x.T).T
+    satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ self.description_mask.T
+    satisfied = satisfied / self.description_card
 
-    return sat
-    
-  def classify(self, s: Situation) -> List[Tuple[Description, float]]:
-    """
-    Classify an input situation and return the probability that it
-    satisfied each class.
-
-    Args:
-        s (Situation): Input situation.
-
-    Returns:
-        List[Tuple[Description, float]]: List of tuples of the type
-          (description, score) where description is one of the 
-          descriptions on the ontology and score is the probability
-          that the situation satisfies a description.
-    """
-    encoded_s = self.encode(s)
-    p = self.infer(encoded_s)[0]
-    return list(zip(self.ontology.descriptions, p))
-    
+    return satisfied  

@@ -8,21 +8,19 @@ import torch
 import torch.nn.functional as F
 
 class ReasonerModule(torch.nn.Module):
-  def __init__(self, ontology: DescriptionCollection, epsilon: float = 0.1, device=torch.device("cpu")):
+  def __init__(self, ontology: DescriptionCollection, device=torch.device("cpu")):
     """
     Initialise the reasoner.
 
     Args:
         ontology (DescriptionCollection): Collection of descriptions 
           used by the reasoner to classify situations.
-        epsilon (float, optional): The epsilon value used to compute k and x_0 in the sigmoid function.
         device (optional): Device on which the reasoner module is loaded on. Defaults to cpu.
     """
     super().__init__()
     self.device = device
     self.ontology = ontology
-    self.epsilon = epsilon
-
+    
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
     self.basis = torch.stack([self.encode(e) for e in self.ontology.elements])
@@ -33,40 +31,9 @@ class ReasonerModule(torch.nn.Module):
     self.description_mask = torch.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
     for d_idx, d in enumerate(self.ontology.descriptions):
       self.description_mask[d_idx, self.description_element_idxs(d)] = 1
-      # idxs = self.description_element_idxs(d)
-      # A = self.basis[:, idxs]
-      # self.description_bases.append(torch.linalg.pinv(A))
+      
     self.description_card = self.description_mask.sum(dim=1)
         
-    # self.A = torch.linalg.inv(self.basis).to(self.device)
-    # # create a matrix that contains ones for element that are within a description
-    # # and 0 for elements that are not within a description
-    # # this will be used to index the correct elements for each description
-    # self.description_mask = torch.zeros(
-    #   (len(self.ontology.descriptions), len(self.ontology.elements)), 
-    #   device=self.device)
-    # for d_idx, d in enumerate(self.ontology.descriptions):
-    #   if len(self.description_element_idxs(d)) > 0:
-    #     self.description_mask[d_idx, self.description_element_idxs(d)] = 1
-    
-    # # keep track of the number of components in each description
-    # self.components_per_descriptions = torch.tensor([
-    #   len(d.elements) for d in self.ontology.descriptions
-    # ])
-
-    # self.descriptions_idxs = torch.tensor([
-    #   self.ontology.elements.index(d) for d in self.ontology.descriptions
-    # ])
-    
-    # compute the parameters for the sigmoid depending on epsilon
-    #k = 10 #round((2 / epsilon) * log((1 - epsilon) / epsilon), 1)
-    #x0 = 0.5 #round((3 / 2) * epsilon, 1)
-    #print(k, x0)
-    #self.sigma = partial(lambda x: 1 / (1 + torch.exp(-1 * (x - x0))))
-    #self.sigma = partial(lambda x: 0.5 + (1/pi) * torch.atan((x - 0.01) / 0.01))
-    #https://arxiv.org/pdf/2102.07156.pdf
-    #self.gamma = 4
-
   def description_element_idxs(self, d: Description) -> torch.tensor:
     """
     Compute the indeces of the bases corresponding to element in the description.
@@ -163,16 +130,10 @@ class ReasonerModule(torch.nn.Module):
           completely satisfied.
     """
     if self.A.device != self.device:
-      #self.components_per_descriptions = self.components_per_descriptions.to(self.device)
-      #self.description_mask = self.description_mask.to(self.device)
-      #self.descriptions_idxs = self.descriptions_idxs.to(self.device)
-      #self.basis = self.basis.to(self.device)
       self.A = self.A.to(self.device)
       self.description_card = self.description_card.to(self.device)
       self.description_mask = self.description_mask.to(self.device)
-      #self.description_bases = [d.to(self.device) for d in self.description_bases]
-      #self.description_bases = self.description_bases.to(self.device)
-
+      
     # turn x into batched if it is not
     x = torch.atleast_2d(x)
     x = F.normalize(x)
