@@ -8,18 +8,20 @@ import torch
 import torch.nn.functional as F
 
 class ReasonerModule(torch.nn.Module):
-  def __init__(self, ontology: DescriptionCollection, device=torch.device("cpu")):
+  def __init__(self, ontology: DescriptionCollection, epsilon: float = 128, device=torch.device("cpu")):
     """
     Initialise the reasoner.
 
     Args:
         ontology (DescriptionCollection): Collection of descriptions 
           used by the reasoner to classify situations.
+        epsilon (float): TBD
         device (optional): Device on which the reasoner module is loaded on. Defaults to cpu.
     """
     super().__init__()
     self.device = device
     self.ontology = ontology
+    self.epsilon = epsilon
     
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
