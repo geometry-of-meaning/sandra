@@ -183,8 +183,7 @@ class ReasonerModule(torch.nn.Module):
     # and x is the situation, the solution y contains the coefficients
     # for each element in the description
     if differentiable:
-      # h = lambda z: 1 - torch.exp(-32 * z) + z * exp(-32)
-      h = lambda x: F.hardtanh(x, min_val=0.0, max_val=1.0)
+      h = lambda z: 1 - torch.exp(-self.epsilon * z) + z * exp(-self.epsilon)
     else:
       h = lambda x: torch.heaviside(x, torch.zeros_like(x))
   
@@ -192,10 +191,4 @@ class ReasonerModule(torch.nn.Module):
     satisfied = h(coefficients) @ self.description_mask.T
     satisfied = satisfied / self.description_card
 
-    # satisfied = torch.stack([
-    #  h(torch.abs(d @ x.T)).sum(dim=0) / len(d)
-    #  for d in self.description_bases
-    # ]).T
-    
     return satisfied
-    #return torch.abs(x @ self.basis)

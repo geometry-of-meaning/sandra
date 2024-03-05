@@ -257,7 +257,7 @@ class Situation(object):
     Returns:
         str: The name of the situation
     """
-    return self.name
+    return "Situation"
 
   def __repr__(self) -> str:
     """
