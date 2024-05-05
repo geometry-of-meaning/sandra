@@ -2,102 +2,108 @@ from typing import List, Union, Tuple
 from functools import partial
 from math import log, pi, atan, exp
 
-from sandra.situation_description import Description, DescriptionCollection, Situation, Element, Component
+from sandra.ontology import Ontology, Situation, Element
 
 import torch
 import torch.nn.functional as F
 
 class ReasonerModule(torch.nn.Module):
-  def __init__(self, ontology: DescriptionCollection, epsilon: float = 128, device=torch.device("cpu")):
+  def __init__(self, ontology: Ontology, epsilon: float = 128, device=torch.device("cpu")):
     """
     Initialise the reasoner.
 
     Args:
-        ontology (DescriptionCollection): Collection of descriptions 
+        ontology (Ontology): Ontology containing roles and descriptions
           used by the reasoner to classify situations.
-        epsilon (float): TBD
+        epsilon (float, optional): Controls the degree of approximation of the smooth Heaviside 
+          according to the function defined in [1]. Defaults to 128.
         device (optional): Device on which the reasoner module is loaded on. Defaults to cpu.
+    
+    [1] Tiwari, R. et al., "ChipNet: Budget-Aware Pruning with Heaviside Continuous Approximations", ICLR 2021
     """
     super().__init__()
     self.device = device
     self.ontology = ontology
     self.epsilon = epsilon
+
+    # cache encodings for faster execution
+    self.__phi_cache = {}
+    self.__encoding = {}
     
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
     self.basis = torch.stack([self.encode(e) for e in self.ontology.elements])
-    self.basis = F.normalize(self.basis).T
+    self.basis = F.normalize(self.basis)
 
-    self.A = torch.linalg.inv(self.basis)
+    self.A = torch.linalg.pinv(self.basis)
     
     self.description_mask = torch.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
     for d_idx, d in enumerate(self.ontology.descriptions):
       self.description_mask[d_idx, self.description_element_idxs(d)] = 1
       
-    self.description_card = self.description_mask.sum(dim=1)
+    self.description_card = torch.tensor([len(d.components) for d in self.ontology.descriptions])
         
-  def description_element_idxs(self, d: Description) -> torch.tensor:
+  def description_element_idxs(self, d: Element) -> torch.tensor:
     """
     Compute the indeces of the bases corresponding to element in the description.
 
     Args:
-        d (Description): Input description.
+        d (Element): Input description.
 
     Returns:
         torch.tensor: Elements' bases
     """
     idxs = set()
-    for e in d.elements:
+    for e in d.components:
       idxs.add(self.ontology.elements.index(e))
-
-      for a in e.ancestors():
-        if type(a) is Description:
-          idxs = idxs.union(self.description_element_idxs(a))
     
     return torch.tensor(list(idxs))
 
-  def g(self, x: Element, y: Element) -> int:
+  def phi(self, x: Element) -> torch.Tensor:
     """
-    Assigns to each pair of elements a value based their relationship.
-    
-    g(x, y) = {
-      1 if x == y
-      0 otherwise
-    }
+    Computes phi for an element.
 
     Args:
-        x (Element): Element x
-        y (Element): Element y
+        x (Element): Element to encode
+    Returns:
+        torch.Tensor: Vector of length (|C| + |D|) representing the encoded.
     """
-    return 1 if x == y or y in x.descendants() else 0
+    if x.name not in self.__phi_cache:
+      encoding = torch.Tensor([
+        1 if x == y or y in x.descendants() else 0 
+        for y in self.ontology.elements])
+      self.__phi_cache[x.name] = encoding
+    else:
+      encoding = self.__phi_cache[x.name]
+    
+    return encoding
 
-  def encode_element(self, e: Element) -> torch.tensor:
+  def encode_element(self, d: Element) -> torch.Tensor:
     """
-    Encode the provided element using the f function.
-
-    f(e) = [ g(e, c_0), ..., g(e, c_n), g(e, d_0), ..., g(e, d_n) ] 
-      for c_0 ... c_n in C and d_0 ... d_n in D
-
+    Encode the provided element.
+    
     Args:
         e (Element): The element that will be encoded.
     Returns:
-        torch.tensor: Tensor of length (|C| + |D|) representing the encoded component.
+        np.Tensor: Vector of length (|C| + |D|) representing the encoded element.
     """
-    return torch.tensor([self.g(e, e_i) for e_i in self.ontology.elements]).float()
-    
+    if d.name in self.__encoding:
+      encoding = self.__encoding[d.name]
+    else:
+      encoding = self.phi(d) + (0 if len(d.components) == 0 else torch.vstack([self.phi(r) for r in d.components]).sum(axis=0))
+      self.__encoding[d.name] = encoding
+    return encoding
+  
   def encode_situation(self, s: Situation) -> torch.tensor:
     """
-    Encode the provided situation using the f~ function.
-
-    f~(s) = [ g~(e, c_0), ..., g~(e, c_n), g~(e, d_0), ..., g~(e, d_n) ] 
-      for c_0 ... c_n in C and d_0 ... d_n in D
+    Encode the provided situation.
 
     Args:
         s (Situation): The situation that will be encoded.
     Returns:
         torch.tensor: Tensor of length (|C| + |D|) representing the encoded situation.
     """
-    return torch.stack([self.encode(c) for c in s.components]).sum(dim=0)
+    return torch.stack([self.encode(c) for c in s.individuals]).sum(dim=0)
 
   def encode(self, x: Union[Situation, Element]) -> torch.tensor:
     """
@@ -114,10 +120,10 @@ class ReasonerModule(torch.nn.Module):
     """
     if type(x) == Situation:
       return self.encode_situation(x)
-    elif type(x) == Description or type(x) == Component:
+    elif type(x) == Element:
       return self.encode_element(x)
     else:
-      raise ValueError(f"{x} is not of type Situation or Description")
+      raise ValueError(f"{e} is not of type Situation or Description")
   
   def forward(self, x: torch.tensor, differentiable=True) -> torch.tensor:
     """
@@ -150,8 +156,34 @@ class ReasonerModule(torch.nn.Module):
     else:
       h = lambda x: torch.heaviside(x, torch.zeros_like(x))
   
-    coefficients = torch.abs(self.A.T @ x.T).T
+    coefficients = self.A @ x.T
+    # remove coefficients smaller than 1e-5
+    coefficients = torch.abs(coefficients).T.clamp(1e-5, 1e5) - 1e-5
+    
     satisfied = h(coefficients) @ self.description_mask.T
     satisfied = satisfied / self.description_card
 
+    return satisfied
+
+  def classify_in_subspace(self, x: torch.Tensor, subspace: torch.Tensor, differentiable: bool = True):
+    if self.A.device != self.device:
+      self.A = self.A.to(self.device)
+      self.description_card = self.description_card.to(self.device)
+      self.description_mask = self.description_mask.to(self.device)
+      
+    card = subspace.sum(axis=1) + 1e-6
+    
+    x = torch.atleast_2d(x)
+    x = F.normalize(x)
+    if differentiable:
+      h = lambda z: 1 - torch.exp(-self.epsilon * z) + z * exp(-self.epsilon)
+      #h = F.relu
+    else:
+      h = lambda x: torch.heaviside(x, torch.zeros_like(x))
+  
+    coefficients = self.A @ x.T
+    coefficients = torch.abs(coefficients).T.clamp(1e-5, 1e5) - 1e-5
+    satisfied = h(coefficients) @ subspace.T
+    satisfied = satisfied / card
+    
     return satisfied

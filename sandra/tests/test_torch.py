@@ -3,12 +3,12 @@ from sandra.torch import ReasonerModule
 import torch
 
 TOY_EXAMPLE_FRAME_PATH = "examples/toy_example_frame/ontology.owl"
-dc = sandra.DescriptionCollection.from_graph(TOY_EXAMPLE_FRAME_PATH)
+dc = sandra.Ontology.from_graph(TOY_EXAMPLE_FRAME_PATH)
 reasoner = ReasonerModule(dc)
 
 def test_components_encoding():
   # compute the encoding for all the components
-  encoded = torch.stack([reasoner.encode_element(e) for e in dc.elements])
+  encoded = torch.stack([reasoner.encode(e) for e in dc.elements])
   
   # since they form a basis, they should all be independent
   # we can check this by computing the eigenvalues on the matrix
@@ -26,7 +26,7 @@ def test_satisfy_specific():
   infer = reasoner(enc_s, differentiable=False)[0]
 
   # check that the first frame (Commerce_buy) has probability > than the others
-  assert torch.allclose(infer[0], torch.tensor([1]).float(), rtol=0.01)
+  assert infer[0] > infer[2]
   
 def test_satisfy_using_a_composed_situation():
   s = sandra.Situation([
@@ -36,9 +36,13 @@ def test_satisfy_using_a_composed_situation():
 
   infer = reasoner(enc_s, differentiable=False)[0]
 
-  # check that the first frame (Commerce_buy) has probability > than the Importing
-  assert infer[0] > infer[2]
-  
+  # check that the first frame (Commerce_buy) has probability ~1
+  assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
+
+  # check that the similar frame (Importing) has probability < than Commerce_buy
+  assert not torch.allclose(infer[2], torch.Tensor([1]), rtol=0.01)
+  assert infer[2] < infer[0]
+
 def test_satisfy_using_a_superclass():
   s = sandra.Situation([
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Goods"], 
@@ -47,11 +51,10 @@ def test_satisfy_using_a_superclass():
 
   infer = reasoner(enc_s, differentiable=False)[0]
   
-  # check that both frames involving Agent and Goods are
-  # satisfied 0.5 < p < 0.9
-  assert infer[0] > 0.0
-  assert infer[2] > 0.0
-  
+  # check that both frames involving Agent and Goods are slightly satisfied
+  assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
+  assert torch.allclose(infer[2], torch.Tensor([0.5]), rtol=0.01)
+
 def test_satisfy_using_both_superclass():
   s = sandra.Situation([
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Asset"], 
@@ -59,17 +62,16 @@ def test_satisfy_using_both_superclass():
   enc_s = reasoner.encode(s)
 
   infer = reasoner(enc_s, differentiable=False)[0]
-  # check that both frames involving Agent and Asset are
-  # satisfied 0.5 < p < 0.9
-  assert infer[0] > 0.0
-  assert infer[2] > 0.0
+  assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.1)
+  assert torch.allclose(infer[2], torch.Tensor([0.5]), rtol=0.1)
   
 def test_satisfy_goods():
   s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])
   enc_s = reasoner.encode(s)
 
   infer = reasoner(enc_s, differentiable=False)[0]
-  assert torch.allclose(infer[1], torch.tensor([1]).float(), rtol=0.01)
+  assert infer[0] > 0.01 and infer[0] < 0.9
+  assert infer[2] > 0.01 and infer[2] < 0.9
 
 def test_satisfy_using_subclass():
   s = sandra.Situation([
@@ -78,7 +80,7 @@ def test_satisfy_using_subclass():
   enc_s = reasoner.encode(s)
 
   infer = reasoner(enc_s, differentiable=False)[0]
-  assert torch.allclose(infer[0], torch.tensor([1]).float(), rtol=0.01)
+  assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
 
 def test_batch_size():
   s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])

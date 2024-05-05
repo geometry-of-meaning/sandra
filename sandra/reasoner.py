@@ -1,94 +1,98 @@
 from typing import List, Union, Tuple
-from sandra.situation_description import Description, DescriptionCollection, Situation, Component, Element
+from sandra.ontology import Ontology, Situation, Element
 import numpy as np
 
 class Reasoner(object):
-  def __init__(self, ontology: DescriptionCollection):
+  def __init__(self, ontology: Ontology):
     """
     Initialise the reasoner.
 
     Args:
-        ontology (DescriptionCollection): Collection of components,
-          and descriptions used by the reasoner to classify situations.
+        ontology (Ontology): Ontology containing roles and descriptions
+          used by the reasoner to classify situations.
     """
     super().__init__()
     self.ontology = ontology
-
+    
+    # cache encodings for faster execution
+    self.__phi_cache = {}
+    self.__encoding = {}
+    
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
-    self.basis = np.stack([self.encode(e) for e in self.ontology.elements]).T
-    self.basis = self.basis / np.linalg.norm(self.basis, axis=0)
+    self.basis = np.stack([self.encode(e) for e in self.ontology.elements])
+    self.basis = self.basis / np.linalg.norm(self.basis, axis=1).reshape(-1, 1)
 
-    self.A = np.linalg.inv(self.basis)
+    self.A = np.linalg.pinv(self.basis)
 
     self.description_mask = np.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
     for d_idx, d in enumerate(self.ontology.descriptions):
       self.description_mask[d_idx, self.description_element_idxs(d)] = 1
       
-    self.description_card = self.description_mask.sum(axis=1)
-
-  def description_element_idxs(self, d: Description) -> np.array:
+    self.description_card = np.array([len(d.components) for d in self.ontology.descriptions])
+    
+  def description_element_idxs(self, d: Element) -> np.array:
     """
     Compute the indeces of the bases corresponding to element in the description.
 
     Args:
-        d (Description): Input description.
+        d (Element): Input description.
 
     Returns:
         np.array: Elements' bases
     """
     idxs = set()
-    for e in d.elements:
+    for e in d.components:
       idxs.add(self.ontology.elements.index(e))
-
-      for a in e.ancestors():
-        if type(a) is Description:
-          idxs = idxs.union(self.description_element_idxs(a))
     
     return np.array(list(idxs))
 
-  def g(self, x: Element, y: Element) -> int:
+  def phi(self, x: Element) -> np.array:
     """
-    Assigns to each pair of elements a value based their relationship.
-    
-    g(x, y) = {
-      1 if x == y
-      0 otherwise
-    }
+    Computes phi for an element.
 
     Args:
-        x (Element): Element x
-        y (Element): Element y
-    """
-    return 1 if x == y or y in x.descendants() else 0
-
-  def encode_element(self, e: Element) -> np.array:
-    """
-    Encode the provided element using the f function.
-
-    f(e) = [ g(e, c_0), ..., g(e, c_n), g(e, d_0), ..., g(e, d_n) ] 
-      for c_0 ... c_n in C and d_0 ... d_n in D
-
-    Args:
-        e (Element): The element that will be encoded.
+        x (Element): Element to encode
     Returns:
-        np.array: Vector of length (|C| + |D|) representing the encoded component.
+        np.array: Vector of length (|C| + |D|) representing the encoded element.
     """
-    return np.array([self.g(e, e_i) for e_i in self.ontology.elements])
+    if x.name not in self.__phi_cache:
+      encoding = np.array([
+        1 if x.name == y.name or y in x.descendants() else 0 
+        for y in self.ontology.elements])
+      self.__phi_cache[x.name] = encoding
+    else:
+      encoding = self.__phi_cache[x.name]
     
+    return encoding
+
+  def encode_element(self, d: Element) -> np.array:
+    """
+    Encode the provided element.
+    
+    Args:
+        d (Element): The element that will be encoded.
+    Returns:
+        np.array: Vector of length (|C| + |D|) representing the encoded element.
+    """
+    if d.name in self.__encoding:
+      encoding = self.__encoding[d.name]
+    else:
+      encoding = self.phi(d) + (0 if len(d.components) == 0 else np.vstack([self.phi(r) for r in d.components]).sum(axis=0))
+      self.__encoding[d.name] = encoding
+
+    return encoding
+
   def encode_situation(self, s: Situation) -> np.array:
     """
-    Encode the provided situation using the f~ function.
-
-    f~(s) = [ g~(e, c_0), ..., g~(e, c_n), g~(e, d_0), ..., g~(e, d_n) ] 
-      for c_0 ... c_n in C and d_0 ... d_n in D
-
+    Encode the provided situation.
+    
     Args:
         s (Situation): The situation that will be encoded.
     Returns:
         np.array: Vector of length (|C| + |D|) representing the encoded situation.
     """
-    return np.stack([self.encode(c) for c in s.components]).sum(axis=0)
+    return np.stack([self.encode(c) for c in s.individuals]).sum(axis=0)
 
   def encode(self, x: Union[Situation, Element]) -> np.array:
     """
@@ -105,7 +109,7 @@ class Reasoner(object):
     """
     if type(x) == Situation:
       return self.encode_situation(x)
-    elif type(x) == Description or type(x) == Component:
+    elif type(x) == Element:
       return self.encode_element(x)
     else:
       raise ValueError(f"{e} is not of type Situation or Description")
@@ -124,17 +128,36 @@ class Reasoner(object):
     """
     # turn x into batched if it is not
     x = np.atleast_2d(x)
-    
-    # normalise x
-    x = x / np.linalg.norm(x, axis=-1).reshape(-1, 1)
 
+    # normalize x
+    x = x / np.linalg.norm(x, axis=1).reshape(-1, 1)
+    
     # in order to satisfy a description, a situation must be expressed
     # as a linear combination of the basis of such description
     # by solving the linear system Ab = x where A is the basis of a description,
     # and b is the situation, the solution x contains the coefficients
     # for each element in the description
-    coefficients = np.abs(self.A.T @ x.T).T
+    coefficients = self.A @ x.T
+    # remove coefficients smaller than 1e-5
+    coefficients = np.abs(coefficients).T.clip(1e-5, 1e5) - 1e-5
+
+    # convert the coefficients into a binary vector
     satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ self.description_mask.T
+    
+    # compute the satisfied descriptions
     satisfied = satisfied / self.description_card
 
-    return satisfied  
+    return satisfied
+
+  def classify_in_subspace(self, x: np.array, subspace: np.array):
+    card = subspace.sum(axis=1)
+
+    # classify similarly to standard inference
+    x = np.atleast_2d(x)
+    x = x / np.linalg.norm(x, axis=1).reshape(-1, 1)
+    coefficients = self.A @ x.T
+    coefficients = np.abs(coefficients).T.clip(1e-5, 1e5) - 1e-5
+    satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ subspace.T
+    satisfied = satisfied / card
+
+    return satisfied

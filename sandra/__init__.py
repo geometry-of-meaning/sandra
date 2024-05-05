@@ -1,2 +1,2 @@
-from sandra.situation_description import DescriptionCollection, Description, Situation, Component
+from sandra.ontology import Ontology, Element, Situation
 from sandra.reasoner import Reasoner
