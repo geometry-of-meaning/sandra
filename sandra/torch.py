@@ -7,6 +7,39 @@ from sandra.ontology import Ontology, Situation, Element
 import torch
 import torch.nn.functional as F
 
+import torch
+import pdb
+import torch.nn as nn
+import math
+from torch.autograd import Variable
+from torch.autograd.function  import Function, InplaceFunction
+
+import numpy as np
+
+class StraighThroughHeaviside(Function):
+  """
+  Implements the straight through heaviside using the gradient estimation
+  technique presented in [1].
+
+  [1] https://arxiv.org/abs/1308.3432
+  """
+  def forward(self, input, threshold = 1e-5):
+    """
+    During the forward pass the regular heaviside function is used.
+    The absolute value of the input values is considered. 
+    A threshold is defined to make sure that small values are replaced by 0.
+    """
+    input = torch.heaviside(input, torch.zeros_like(input))
+    return input
+        
+  def backward(self, grad_output):
+    """
+    During the backward pass, the gradient of the heaviside
+    is approximated by simply copying the input gradients.
+    """
+    return grad_output, None, None, None
+
+
 class ReasonerModule(torch.nn.Module):
   def __init__(self, ontology: Ontology, epsilon: float = 128, device=torch.device("cpu")):
     """
@@ -32,12 +65,10 @@ class ReasonerModule(torch.nn.Module):
     
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
-    self.basis = torch.stack([self.encode(e) for e in self.ontology.elements])
+    self.basis = torch.stack([self.encode(e) for e in self.ontology.roles])
     self.basis = F.normalize(self.basis)
 
-    self.A = torch.linalg.pinv(self.basis)
-    
-    self.description_mask = torch.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
+    self.description_mask = torch.zeros((len(self.ontology.descriptions), len(self.ontology.roles)))
     for d_idx, d in enumerate(self.ontology.descriptions):
       self.description_mask[d_idx, self.description_element_idxs(d)] = 1
       
@@ -55,7 +86,7 @@ class ReasonerModule(torch.nn.Module):
     """
     idxs = set()
     for e in d.components:
-      idxs.add(self.ontology.elements.index(e))
+      idxs.add(self.ontology.roles.index(e))
     
     return torch.tensor(list(idxs))
 
@@ -71,7 +102,7 @@ class ReasonerModule(torch.nn.Module):
     if x.name not in self.__phi_cache:
       encoding = torch.Tensor([
         1 if x == y or y in x.descendants() else 0 
-        for y in self.ontology.elements])
+        for y in self.ontology.roles])
       self.__phi_cache[x.name] = encoding
     else:
       encoding = self.__phi_cache[x.name]
@@ -90,7 +121,7 @@ class ReasonerModule(torch.nn.Module):
     if d.name in self.__encoding:
       encoding = self.__encoding[d.name]
     else:
-      encoding = self.phi(d) + (0 if len(d.components) == 0 else torch.vstack([self.phi(r) for r in d.components]).sum(axis=0))
+      encoding = self.phi(d) + (0 if len(d.components) == 0 else torch.vstack([self.encode_element(r) for r in d.components]).sum(axis=0))
       self.__encoding[d.name] = encoding
     return encoding
   
@@ -125,7 +156,7 @@ class ReasonerModule(torch.nn.Module):
     else:
       raise ValueError(f"{e} is not of type Situation or Description")
   
-  def forward(self, x: torch.tensor, differentiable=True) -> torch.tensor:
+  def forward(self, x: torch.tensor) -> torch.tensor:
     """
     Infer the descriptions that are satisfied by the encoded situation x.
 
@@ -137,8 +168,8 @@ class ReasonerModule(torch.nn.Module):
           and each description. If distance is 0 then the description is
           completely satisfied.
     """
-    if self.A.device != self.device:
-      self.A = self.A.to(self.device)
+    if self.basis.device != self.device:
+      self.basis = self.basis.to(self.device)
       self.description_card = self.description_card.to(self.device)
       self.description_mask = self.description_mask.to(self.device)
       
@@ -151,39 +182,8 @@ class ReasonerModule(torch.nn.Module):
     # by solving the linear system Ax = y where A is the basis of a description,
     # and x is the situation, the solution y contains the coefficients
     # for each element in the description
-    if differentiable:
-      h = lambda z: 1 - torch.exp(-self.epsilon * z) + z * exp(-self.epsilon)
-    else:
-      h = lambda x: torch.heaviside(x, torch.zeros_like(x))
-  
-    coefficients = self.A @ x.T
-    # remove coefficients smaller than 1e-5
-    coefficients = torch.abs(coefficients).T.clamp(1e-5, 1e5) - 1e-5
-    
-    satisfied = h(coefficients) @ self.description_mask.T
-    satisfied = satisfied / self.description_card
+    orthogonality = StraighThroughHeaviside.apply(x @ self.basis.T) @ self.description_mask.T
+    #satisfied = StraighThroughHeaviside.apply((coefficients ** 2).T) @ self.description_mask.T
+    satisfied = orthogonality / self.description_card
 
-    return satisfied
-
-  def classify_in_subspace(self, x: torch.Tensor, subspace: torch.Tensor, differentiable: bool = True):
-    if self.A.device != self.device:
-      self.A = self.A.to(self.device)
-      self.description_card = self.description_card.to(self.device)
-      self.description_mask = self.description_mask.to(self.device)
-      
-    card = subspace.sum(axis=1) + 1e-6
-    
-    x = torch.atleast_2d(x)
-    x = F.normalize(x)
-    if differentiable:
-      h = lambda z: 1 - torch.exp(-self.epsilon * z) + z * exp(-self.epsilon)
-      #h = F.relu
-    else:
-      h = lambda x: torch.heaviside(x, torch.zeros_like(x))
-  
-    coefficients = self.A @ x.T
-    coefficients = torch.abs(coefficients).T.clamp(1e-5, 1e5) - 1e-5
-    satisfied = h(coefficients) @ subspace.T
-    satisfied = satisfied / card
-    
     return satisfied

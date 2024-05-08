@@ -8,7 +8,7 @@ reasoner = ReasonerModule(dc)
 
 def test_components_encoding():
   # compute the encoding for all the components
-  encoded = torch.stack([reasoner.encode(e) for e in dc.elements])
+  encoded = torch.stack([reasoner.encode(e) for e in dc.roles])
   
   # since they form a basis, they should all be independent
   # we can check this by computing the eigenvalues on the matrix
@@ -23,7 +23,7 @@ def test_satisfy_specific():
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Buyer"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
 
   # check that the first frame (Commerce_buy) has probability > than the others
   assert infer[0] > infer[2]
@@ -34,7 +34,7 @@ def test_satisfy_using_a_composed_situation():
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Buyer"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
 
   # check that the first frame (Commerce_buy) has probability ~1
   assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
@@ -49,7 +49,7 @@ def test_satisfy_using_a_superclass():
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Agent"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
   
   # check that both frames involving Agent and Goods are slightly satisfied
   assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
@@ -61,7 +61,7 @@ def test_satisfy_using_both_superclass():
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Agent"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
   assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.1)
   assert torch.allclose(infer[2], torch.Tensor([0.5]), rtol=0.1)
   
@@ -69,7 +69,7 @@ def test_satisfy_goods():
   s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
   assert infer[0] > 0.01 and infer[0] < 0.9
   assert infer[2] > 0.01 and infer[2] < 0.9
 
@@ -79,20 +79,22 @@ def test_satisfy_using_subclass():
     dc["https://w3id.org/geometryofmeaning/toy_example_frame/Wholesale_buyer"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(enc_s, differentiable=False)[0]
+  infer = reasoner(enc_s)[0]
   assert torch.allclose(infer[0], torch.Tensor([1]), rtol=0.01)
 
 def test_batch_size():
   s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])
   enc_s = reasoner.encode(s)
 
-  infer = reasoner(torch.stack([enc_s, enc_s]), differentiable=False)[0]
-  pass
+  infer = reasoner(torch.stack([enc_s, enc_s]))[0]
 
 def test_random_probability_valid():
-  s = sandra.Situation([dc["https://w3id.org/geometryofmeaning/toy_example_frame/Quantity"]])
-  enc_s = reasoner.encode(s)
-
-  infer = reasoner(torch.randn(10000, len(reasoner.ontology.elements)), differentiable=False)
+  infer = reasoner(torch.randn(10000, len(reasoner.ontology.roles)))
   assert infer.min() >= 0
   assert infer.max() <= 1
+
+def test_gradient_differentiable():
+  situation = torch.randn(10, len(reasoner.ontology.roles), requires_grad=True, dtype=torch.float)
+  infer = reasoner(situation)
+  loss = torch.nn.functional.binary_cross_entropy(infer, torch.zeros_like(infer))
+  loss.backward()

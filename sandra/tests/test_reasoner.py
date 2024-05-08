@@ -8,7 +8,7 @@ def test_components_encoding():
   dc = sandra.Ontology.from_graph(TOY_EXAMPLE_FRAME_PATH)
   reasoner = sandra.Reasoner(dc)
   # compute the encoding for all the components
-  encoded = np.stack([reasoner.encode(e) for e in dc.elements])
+  encoded = np.stack([reasoner.encode(e) for e in dc.roles])
   
   # since they form a basis, they should all be independent
   # we can check this by computing the eigenvalues on the matrix

@@ -19,6 +19,7 @@ class Element(object):
     self.__parents = set()
     self.__children = set()
     self._components = set()
+    self._component_of = set()
 
   @property
   def components(self) -> Set["Element"]:
@@ -120,6 +121,7 @@ class Element(object):
     """
     if e != self:
       self._components.add(e)
+      e._component_of.add(self)
 
   @property
   def is_description(self) -> bool:
@@ -160,7 +162,7 @@ class Element(object):
     Returns:
         bool: Whether the element is a role.
     """
-    return len(self.components) == 0
+    return len(self.components) == 0 or len(self._component_of) > 0
 
   def __str__(self) -> str:
     """

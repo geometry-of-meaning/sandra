@@ -20,12 +20,10 @@ class Reasoner(object):
     
     # compute the basis that spans the whole space by constructing
     # a matrix where the column are the encoding of each element
-    self.basis = np.stack([self.encode(e) for e in self.ontology.elements])
+    self.basis = np.stack([self.encode(e) for e in self.ontology.roles])
     self.basis = self.basis / np.linalg.norm(self.basis, axis=1).reshape(-1, 1)
 
-    self.A = np.linalg.pinv(self.basis)
-
-    self.description_mask = np.zeros((len(self.ontology.descriptions), len(self.ontology.elements)))
+    self.description_mask = np.zeros((len(self.ontology.descriptions), len(self.ontology.roles)))
     for d_idx, d in enumerate(self.ontology.descriptions):
       self.description_mask[d_idx, self.description_element_idxs(d)] = 1
       
@@ -43,7 +41,7 @@ class Reasoner(object):
     """
     idxs = set()
     for e in d.components:
-      idxs.add(self.ontology.elements.index(e))
+      idxs.add(self.ontology.roles.index(e))
     
     return np.array(list(idxs))
 
@@ -59,7 +57,7 @@ class Reasoner(object):
     if x.name not in self.__phi_cache:
       encoding = np.array([
         1 if x.name == y.name or y in x.descendants() else 0 
-        for y in self.ontology.elements])
+        for y in self.ontology.roles])
       self.__phi_cache[x.name] = encoding
     else:
       encoding = self.__phi_cache[x.name]
@@ -78,7 +76,7 @@ class Reasoner(object):
     if d.name in self.__encoding:
       encoding = self.__encoding[d.name]
     else:
-      encoding = self.phi(d) + (0 if len(d.components) == 0 else np.vstack([self.phi(r) for r in d.components]).sum(axis=0))
+      encoding = self.phi(d) + (0 if len(d.components) == 0 else np.vstack([self.encode_element(r) for r in d.components]).sum(axis=0))
       self.__encoding[d.name] = encoding
 
     return encoding
@@ -137,27 +135,9 @@ class Reasoner(object):
     # by solving the linear system Ab = x where A is the basis of a description,
     # and b is the situation, the solution x contains the coefficients
     # for each element in the description
-    coefficients = self.A @ x.T
-    # remove coefficients smaller than 1e-5
-    coefficients = np.abs(coefficients).T.clip(1e-5, 1e5) - 1e-5
-
-    # convert the coefficients into a binary vector
-    satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ self.description_mask.T
+    orthogonality = np.heaviside(x @ self.basis.T, np.zeros_like(x)) @ self.description_mask.T
     
     # compute the satisfied descriptions
-    satisfied = satisfied / self.description_card
-
-    return satisfied
-
-  def classify_in_subspace(self, x: np.array, subspace: np.array):
-    card = subspace.sum(axis=1)
-
-    # classify similarly to standard inference
-    x = np.atleast_2d(x)
-    x = x / np.linalg.norm(x, axis=1).reshape(-1, 1)
-    coefficients = self.A @ x.T
-    coefficients = np.abs(coefficients).T.clip(1e-5, 1e5) - 1e-5
-    satisfied = np.heaviside(coefficients, np.zeros_like(coefficients)) @ subspace.T
-    satisfied = satisfied / card
+    satisfied = orthogonality / self.description_card
 
     return satisfied
