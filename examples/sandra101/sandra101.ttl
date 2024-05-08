@@ -1,0 +1,178 @@
+@prefix : <https://w3id.org/sandra/sandra101/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@base <https://w3id.org/sandra/sandra101/> .
+
+[ rdf:type owl:Ontology
+ ] .
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  https://w3id.org/sandra/sandra101/hasRole
+:hasRole rdf:type owl:ObjectProperty .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  https://w3id.org/sandra/sandra101#Bathroom
+<https://w3id.org/sandra/sandra101#Bathroom> rdf:type owl:Class ;
+                                             rdfs:subClassOf <https://w3id.org/sandra/sandra101#Room> ,
+                                                             [ rdf:type owl:Restriction ;
+                                                               owl:onProperty :hasRole ;
+                                                               owl:someValuesFrom <https://w3id.org/sandra/sandra101#HygieneEquipment>
+                                                             ] ,
+                                                             [ rdf:type owl:Restriction ;
+                                                               owl:onProperty :hasRole ;
+                                                               owl:someValuesFrom <https://w3id.org/sandra/sandra101#HygieneProducts>
+                                                             ] .
+
+
+###  https://w3id.org/sandra/sandra101#Bedroom
+<https://w3id.org/sandra/sandra101#Bedroom> rdf:type owl:Class ;
+                                            rdfs:subClassOf <https://w3id.org/sandra/sandra101#Room> ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#ClothingStorage>
+                                                            ] ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#PersonalItems>
+                                                            ] ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#SleepingFurniture>
+                                                            ] .
+
+
+###  https://w3id.org/sandra/sandra101#ClothingStorage
+<https://w3id.org/sandra/sandra101#ClothingStorage> rdf:type owl:Class ;
+                                                    rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#CookingAppliance
+<https://w3id.org/sandra/sandra101#CookingAppliance> rdf:type owl:Class ;
+                                                     rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#CookingUtensil
+<https://w3id.org/sandra/sandra101#CookingUtensil> rdf:type owl:Class ;
+                                                   rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#DecorativeItems
+<https://w3id.org/sandra/sandra101#DecorativeItems> rdf:type owl:Class ;
+                                                    rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#DiningFurniture
+<https://w3id.org/sandra/sandra101#DiningFurniture> rdf:type owl:Class ;
+                                                    rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#DiningRoom
+<https://w3id.org/sandra/sandra101#DiningRoom> rdf:type owl:Class ;
+                                               rdfs:subClassOf <https://w3id.org/sandra/sandra101#Room> ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#DecorativeItems>
+                                                               ] ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#DiningFurniture>
+                                                               ] ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#ServingItems>
+                                                               ] .
+
+
+###  https://w3id.org/sandra/sandra101#EntertainmentDevices
+<https://w3id.org/sandra/sandra101#EntertainmentDevices> rdf:type owl:Class ;
+                                                         rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#FoodStorage
+<https://w3id.org/sandra/sandra101#FoodStorage> rdf:type owl:Class ;
+                                                rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#HygieneEquipment
+<https://w3id.org/sandra/sandra101#HygieneEquipment> rdf:type owl:Class ;
+                                                     rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#HygieneProducts
+<https://w3id.org/sandra/sandra101#HygieneProducts> rdf:type owl:Class ;
+                                                    rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#Kitchen
+<https://w3id.org/sandra/sandra101#Kitchen> rdf:type owl:Class ;
+                                            rdfs:subClassOf <https://w3id.org/sandra/sandra101#Room> ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#CookingAppliance>
+                                                            ] ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#CookingUtensil>
+                                                            ] ,
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty :hasRole ;
+                                                              owl:someValuesFrom <https://w3id.org/sandra/sandra101#FoodStorage>
+                                                            ] .
+
+
+###  https://w3id.org/sandra/sandra101#LivingRoom
+<https://w3id.org/sandra/sandra101#LivingRoom> rdf:type owl:Class ;
+                                               rdfs:subClassOf <https://w3id.org/sandra/sandra101#Room> ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#DecorativeItems>
+                                                               ] ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#EntertainmentDevices>
+                                                               ] ,
+                                                               [ rdf:type owl:Restriction ;
+                                                                 owl:onProperty :hasRole ;
+                                                                 owl:someValuesFrom <https://w3id.org/sandra/sandra101#SeatingFurniture>
+                                                               ] .
+
+
+###  https://w3id.org/sandra/sandra101#PersonalItems
+<https://w3id.org/sandra/sandra101#PersonalItems> rdf:type owl:Class ;
+                                                  rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#Room
+<https://w3id.org/sandra/sandra101#Room> rdf:type owl:Class .
+
+
+###  https://w3id.org/sandra/sandra101#RoomRole
+<https://w3id.org/sandra/sandra101#RoomRole> rdf:type owl:Class .
+
+
+###  https://w3id.org/sandra/sandra101#SeatingFurniture
+<https://w3id.org/sandra/sandra101#SeatingFurniture> rdf:type owl:Class ;
+                                                     rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#ServingItems
+<https://w3id.org/sandra/sandra101#ServingItems> rdf:type owl:Class ;
+                                                 rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  https://w3id.org/sandra/sandra101#SleepingFurniture
+<https://w3id.org/sandra/sandra101#SleepingFurniture> rdf:type owl:Class ;
+                                                      rdfs:subClassOf <https://w3id.org/sandra/sandra101#RoomRole> .
+
+
+###  Generated by the OWL API (version 4.5.25.2023-02-15T19:15:49Z) https://github.com/owlcs/owlapi
