@@ -23,7 +23,7 @@ class StraighThroughHeaviside(Function):
 
   [1] https://arxiv.org/abs/1308.3432
   """
-  def forward(self, input, threshold = 1e-5):
+  def forward(self, input):
     """
     During the forward pass the regular heaviside function is used.
     The absolute value of the input values is considered. 
@@ -37,11 +37,12 @@ class StraighThroughHeaviside(Function):
     During the backward pass, the gradient of the heaviside
     is approximated by simply copying the input gradients.
     """
-    return grad_output, None, None, None
+    grad = F.hardtanh(grad_output, -1.0, 1.0)
+    return grad, None, None, None
 
 
 class ReasonerModule(torch.nn.Module):
-  def __init__(self, ontology: Ontology, epsilon: float = 128, device=torch.device("cpu")):
+  def __init__(self, ontology: Ontology, device=torch.device("cpu")):
     """
     Initialise the reasoner.
 
@@ -51,13 +52,10 @@ class ReasonerModule(torch.nn.Module):
         epsilon (float, optional): Controls the degree of approximation of the smooth Heaviside 
           according to the function defined in [1]. Defaults to 128.
         device (optional): Device on which the reasoner module is loaded on. Defaults to cpu.
-    
-    [1] Tiwari, R. et al., "ChipNet: Budget-Aware Pruning with Heaviside Continuous Approximations", ICLR 2021
     """
     super().__init__()
     self.device = device
     self.ontology = ontology
-    self.epsilon = epsilon
 
     # cache encodings for faster execution
     self.__phi_cache = {}
@@ -179,11 +177,8 @@ class ReasonerModule(torch.nn.Module):
 
     # in order to satisfy a description, a situation must be expressed
     # as a linear combination of the basis of such description
-    # by solving the linear system Ax = y where A is the basis of a description,
-    # and x is the situation, the solution y contains the coefficients
-    # for each element in the description
+    # we check whether the situation is orthogonal to each basis
     orthogonality = StraighThroughHeaviside.apply(x @ self.basis.T) @ self.description_mask.T
-    #satisfied = StraighThroughHeaviside.apply((coefficients ** 2).T) @ self.description_mask.T
     satisfied = orthogonality / self.description_card
 
     return satisfied
