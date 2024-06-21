@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sandra"
-version = "1.0.0"
+version = "0.1"
 dependencies = [
     "rdflib>=7.0.0",
     "numpy>=1.26.2",
