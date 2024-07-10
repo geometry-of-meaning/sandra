@@ -1,6 +1,8 @@
 from typing import List, Union, Dict, Tuple, Set
 from itertools import chain
 import rdflib
+from urllib.parse import urlparse
+from os import path
 
 class Element(object):
   """
@@ -368,3 +370,39 @@ class Ontology(dict):
         parent.add_child(element)
 
     return ontology
+
+  def export(self, 
+             base_iri: rdflib.Namespace = rdflib.Namespace("http://w3id.org/sandra/exported/"),
+             role_class: str = "Role",
+             description_class: str = "Description",
+             property_name: str = "hasRole") -> rdflib.Graph:
+    graph = rdflib.Graph()
+
+    # munge iri for all the elements of the ontology
+    iris = {
+      el.name: base_iri[path.basename(urlparse(el.name).path)]
+      for el in self.elements
+    }
+
+    for role in self.roles:
+      # add to graph
+      graph.add((iris[role.name], rdflib.RDF.type, rdflib.OWL.Class))
+      graph.add((iris[role.name], rdflib.RDFS.subClassOf, base_iri[role_class]))
+
+    # add descriptions
+    for description in self.descriptions:
+      graph.add((iris[description.name], rdflib.RDF.type, rdflib.OWL.Class))
+      graph.add((iris[description.name], rdflib.RDFS.subClassOf, base_iri[description_class]))
+
+      # add all the existential restrictions
+      for component in description.components:
+        # build existential restriction axiom
+        restriction = rdflib.BNode()
+        graph.add((restriction, rdflib.RDF.type, rdflib.OWL.Restriction))
+        graph.add((restriction, rdflib.OWL.onProperty, base_iri[property_name]))
+        graph.add((restriction, rdflib.OWL.someValuesFrom, iris[component.name]))
+
+        # add it to the proper class
+        graph.add((iris[description.name], rdflib.RDFS.subClassOf, restriction))
+
+    return graph
