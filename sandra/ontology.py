@@ -1,408 +1,190 @@
 from typing import List, Union, Dict, Tuple, Set
 from itertools import chain
+from collections import defaultdict
 import rdflib
 from urllib.parse import urlparse
 from os import path
+from urllib.parse import quote_plus
 
+from dataclasses import dataclass
+
+BASE_IRI = rdflib.Namespace("https://w3id.org/geometryofmeaning/sandra#")
+DEFAULT_FRAME_IRI = BASE_IRI["Frame"]
+DEFAULT_ATTRIBUTE_IRI = BASE_IRI["Attribute"]
+DEFAULT_COMPONENT_IRI = BASE_IRI["hasComponent"]
+
+@dataclass
 class Element(object):
   """
-  An element is an abstraction of an element in the ontology.
-  Any element in the ontology is always considered as predicate whose arity can be >= 1.
-  It also defines a hierarchical structure: any element can be organized in a taxonomy.
+  An abstraction of an element in the Knowledge Base.
   """
-  def __init__(self, name: str):
-    """
-    Initialize an element
-
-    Args:
-        name (str): Name of the element.
-    """
-    self.name = name
-    self.__parents = set()
-    self.__children = set()
-    self._components = set()
-    self._component_of = set()
-
-  @property
-  def components(self) -> Set["Element"]:
-    """
-    Return the components (elements) of this element.
-
-    Returns:
-        Set[Element]: Set of elements of this element.
-    """
-    return self._components
-
-  @property
-  def parents(self) -> Set["Element"]:
-    """
-    Returns the parents of the current element in the taxonomy.
-
-    Returns:
-        Set[Element]: Set of parents of this element.
-    """
-    return self.__parents
-
-  @property
-  def children(self) -> Set["Element"]:
-    """
-    Returns the children of the current element in the taxonomy.
-
-    Returns:
-        Set[Element]: Set of children of this element.
-    """
-    return self.__children
-
-  def add_parent(self, e: "Element"):
-    """
-    Add a parent to the element.
-
-    Args:
-        c (Element): Element added as parent.
-    """
-    if e != self:
-      self.__parents.add(e)
-      e.__children.add(self)
-    
-  def add_child(self, e: "Element"):
-    """
-    Add a child to the element.
-
-    Args:
-        e (Element): Element added as child.
-    """
-    if e != self:
-      self.__children.add(e)
-      e.__parents.add(self)
-
-  def ancestors(self, visited = set()) -> List["Element"]:
-    """
-    Compute the parents of the current element up to the most general
-    element available in the same hierarchy.
-
-    Returns:
-        List[Element]: List of ancestors of the current element.
-    """
-    if not hasattr(self, "__cached_ancestors"):
-      visited.add(self)
-      ancestors = set(self.parents)
-      for p in self.parents:
-        if p not in visited:
-          ancestors = ancestors.union(p.ancestors(visited=visited))
-      
-      self.__cached_ancestors = ancestors
-      
-    return self.__cached_ancestors
-
-  def descendants(self, visited = set()) -> List["Element"]:
-    """
-    Compute the children of the current element up to the most specific
-    element available in the same hierarchy.
-
-    Returns:
-        List[Element]: List of descendants of the current element.
-    """
-    if not hasattr(self, "__cached_descendants"):
-      visited.add(self)
-      descendants = set(self.children)
-      for c in self.children:
-        if c not in visited:
-          descendants = descendants.union(c.descendants(visited=visited))
-
-      self.__cached_descendants = descendants
-      
-    return self.__cached_descendants
-
-  def add(self, e: "Element"):
-    """
-    Adds a component of this element, transforming the element itself
-    from a unary predicate to an n-ary predicate.
-
-    Args:
-        e (Element): Element added as component.
-    """
-    if e != self:
-      self._components.add(e)
-      e._component_of.add(self)
-
-  @property
-  def is_description(self) -> bool:
-    """
-    A description is an n-ary element and in the DnS framework is an entity that provides 
-    the unity criterion to a "state of affairs".
-    It partly represents a (possibly formalized) theory T (or one of its elements).
-    It is a tuple formed by components defined by the theory T. 
-    Examples of a description are a diagnosis, a climate change theory, etc.
-    
-    Differently than the original DnS formalization [1], a role can be an n-ary predicate.
-    In that case, it is further composed of other roles and effectively acts as a description.
-    Difference between a Role and a Description is kept to mantain coherency
-    with the ones proposed by other frame semantics model, such as [2].
-
-    [1] Gangemi, Aldo, and Peter Mika. "Understanding the semantic web through descriptions and situations." 
-      OTM Confederated International Conferences" On the Move to Meaningful Internet Systems". 
-      Berlin, Heidelberg: Springer Berlin Heidelberg, 2003.
-
-    Returns:
-        bool: Whether the element is a description.
-    """
-    return len(self.components) > 0
-
-  @property
-  def is_role(self) -> bool:
-    """
-    A role is an entity used to describe a state of affairs.
-    Examples include a sample in a clinical data set, 
-    a temperature, spatio-temporal coordinates etc.
-    Roles are systematically related to descriptions in order to allow
-    situations to satisfy some descriptions.
-    
-    [1] Gangemi, Aldo, and Peter Mika. "Understanding the semantic web through descriptions and situations." 
-      OTM Confederated International Conferences" On the Move to Meaningful Internet Systems". 
-      Berlin, Heidelberg: Springer Berlin Heidelberg, 2003.
-
-    Returns:
-        bool: Whether the element is a role.
-    """
-    return len(self.components) == 0 or len(self._component_of) > 0
-
-  def __str__(self) -> str:
-    """
-    Returns:
-        str: The role's name
-    """
-    return self.name
+  name: str
 
   def __repr__(self) -> str:
     """
     Returns:
         str: A string to represent the role
     """
-    role_or_description = "Role" if self.is_role else "Description"
-    return f"<{role_or_description}({str(self)})>"
+    return f"Element<{self.name}>"
+
+  def __hash__(self) -> int:
+    return hash(self.name)
+
+  def __lt__(self, b: "Element"):
+    return self.name < b.name
+
+  def __gt__(self, b: "Element"):
+    return self.name < b.name
 
 
-class Situation(object):
+@dataclass
+class Attribute(Element):
   """
-  A situation is intended as as a unitarian entity out of a "state of affairs", where 
-  the unity criterion is provided by a Description.
-  A state of affairs is a any non-empty set of assertions, representing a second-order entity.
-  Examples include a clinical data set, a set of temperatures with spatio-temporal coordinates, etc.
-  
-  A situation must be systematically related to the roles of a description in order 
-  to constitute a situation.
-  It is composed of individuals, which have classified. The types of those roles is composed
-  by the set of roles within the ontology.
-
-  A situation satisfies a description when that description constitutes a valid interpretation
-  that explains that situation.
-  
-  [1] Gangemi, Aldo, and Peter Mika. "Understanding the semantic web through descriptions and situations." 
-    OTM Confederated International Conferences" On the Move to Meaningful Internet Systems". 
-    Berlin, Heidelberg: Springer Berlin Heidelberg, 2003.
+  An attribute on the Knowledge Base.
   """
-  def __init__(self, individuals: List[Union[Element, "Situation"]] = []):
-    """
-    Create a situation. Optionally initialise it with the specified individuals.
+  def __hash__(self) -> int:
+    return hash(self.name)
 
-    Args:
-        individuals (List[Element | "Situation"] optional): 
-          The initial individuals that are added to the situation. Defaults to [].
-    """
-    self.individuals = individuals
 
-  def __str__(self) -> str:
-    """
-    Returns:
-        str: The name of the situation
-    """
-    return f"{len(self.individuals)} individuals"
+@dataclass
+class Frame(Element):
+  """
+  A frame in the Knowledge Base.
+  """
+  components: list[Attribute]
+
+  def __hash__(self) -> int:
+    return hash(self.name)
+
+
+
+def parse_attributes_taxonomy(graph, node, nodes = {}, parents = defaultdict(list)):
+  if node not in nodes:
+      # strip iri
+      nodes[node] = Attribute(str(node))
+
+  for child, _, _ in graph.triples((None, rdflib.RDFS.subClassOf, node)):
+    nodes, parents = parse_attributes_taxonomy(graph, child, nodes, parents)
+    parents[nodes[child]].append(nodes[node])
+  
+  return nodes, parents
+
+def parse_frames_taxonomy(graph, attributes, node, r_iri, nodes = {}, parents = defaultdict(list)):
+  if node not in nodes:
+    # extract the components of this node
+    components = graph.objects(node, rdflib.RDFS.subClassOf)
+    components = filter(lambda c: next(graph.objects(c, rdflib.RDF.type)) == rdflib.OWL.Restriction, components)
+    components = filter(lambda c: next(graph.objects(c, rdflib.OWL.onProperty)) == r_iri, components)
+    components = map(lambda c: next(graph.objects(c, rdflib.OWL.someValuesFrom)), components)
+    components = [attributes[a] for a in components]
+    
+    # TODO: strip iri
+    nodes[node] = Frame(str(node), components)
+
+  for child, _, _ in graph.triples((None, rdflib.RDFS.subClassOf, node)):
+    nodes, parents = parse_frames_taxonomy(graph, attributes, child, r_iri, nodes, parents)
+    parents[nodes[child]].append(nodes[node])
+  
+  return nodes, parents
+
+@dataclass
+class KnowledgeBase(object):
+  """
+  A Knowledge Base is defined as a finite set of attributes and frames.
+  It also includes hierarchical relations between attributes and frames.
+  """
+  attributes: list[Attribute]
+  attributes_parents: dict[Attribute, list[Attribute]]
+
+  frames: list[Frame]
+  frames_parents: dict[Frame, list[Frame]]
+
+  def parents(self, x):
+    match x:
+      case Attribute():
+        parents = set(self.attributes_parents[x])
+      case Frame():
+        parents = set(self.frames_parents[x])
+    
+    collected_parent = parents.copy()
+    for p in parents:
+      collected_parent.add(p)
+      collected_parent.update(self.parents(p))
+
+    return collected_parent
+
+  def __len__(self) -> int:
+    return len(self.attributes) + len(self.frames)
 
   def __repr__(self) -> str:
-    """
-    Returns:
-        str: The string representation of the situation.
-    """
-    return f"<S({str(self)})>"
+    return f"KnowledgeBase({len(self.attributes)} attributes, {len(self.frames)} frames)"
 
-  def add(self, e: Union[Element, "Situation"]):
-    """
-    Add an individual to the situation.
-
-    Args:
-        e (Element | "Situation"): Element to add to the situation.
-    """
-    self.individuals.append(e)
-
-
-class Ontology(dict):
-  """
-  A description collection is a class that acts as a collector of descriptions
-  and provides methods to efficiently access a description or load collections
-  descriptions from an OWL ontology serialised in RDF.
-  """
-  ROLES_QUERY = """
-  PREFIX owl: <http://www.w3.org/2002/07/owl#>
-  PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-  SELECT DISTINCT ?role WHERE {{ 
-    ?role a <{role_class}> .
-    MINUS {{ ?role rdfs:subClassOf/owl:someValuesFrom [] }} 
-    FILTER (!ISBLANK(?role))
-  }}
-  """
-
-  DESCRIPTIONS_QUERY = """
-  PREFIX owl: <http://www.w3.org/2002/07/owl#>
-  PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-  SELECT DISTINCT ?description ?role WHERE {{
-    ?description rdfs:subClassOf/owl:someValuesFrom ?role .
-    ?description a <{description_class}> .
+  def to_graph(self,
+    base_iri: rdflib.Namespace | str = BASE_IRI,
+    attribute_iri: rdflib.URIRef | str = DEFAULT_ATTRIBUTE_IRI,
+    frame_iri: rdflib.URIRef | str = DEFAULT_FRAME_IRI,
+    r_iri: rdflib.URIRef | str = DEFAULT_COMPONENT_IRI) -> rdflib.Graph:
     
-    {{ ?role a <{role_class}> }}
-    UNION
-    {{ ?role a <{description_class}> }}
-    
-    FILTER (!ISBLANK(?description))
-  }}
-  """
-
-  HIERARCHY_QUERY = """
-    PREFIX owl: <http://www.w3.org/2002/07/owl#>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-    SELECT DISTINCT ?element ?parent ?parent WHERE {{
-      ?element rdfs:subClassOf ?parent .
-
-      {{ ?element a <{description_class}> }}
-      UNION
-      {{ ?element a <{role_class}> }}
-      
-      {{ ?parent a <{description_class}> }}
-      UNION
-      {{ ?parent a <{role_class}> }}
-      
-      FILTER (!ISBLANK(?element))
-      FILTER (!ISBLANK(?parent))
-    }}
-    """
-
-  @property
-  def elements(self) -> List[Element]:
-    """
-    Returns:
-        List[Element]: The list of elements contained in the ontology.
-    """
-    return [x for x in self.values()]
-
-  @property
-  def descriptions(self) -> List[Element]:
-    """
-    Returns:
-        List[Description]: The list of descriptions contained in the collection.
-    """
-    return [x for x in self.values() if x.is_description]
-
-  @property
-  def roles(self) -> List[Element]:
-    """
-    Returns:
-        List[Component]: The list of roles contained in the collection.
-    """
-    return [x for x in self.values() if x.is_role]
-    
-  def add(self, d: Element):
-    """
-    Add a description to the ontology.
-
-    Args:
-        d (Description): Description to add in the ontology.
-    """
-    if d.name not in self:
-      self[d.name] = d
-
-  @classmethod
-  def from_graph(cls, 
-    graph: Union[rdflib.Graph, str], 
-    role_class: rdflib.URIRef = rdflib.OWL.Class,
-    description_class: rdflib.URIRef = rdflib.OWL.Class) -> "Ontology":
-    """
-    Load an ontology of descriptions from an RDF file.
-
-    Args:
-        graph (rdflib.Graph): Input RDF graph.
-        role_class (rdflib.URIRef, optional): Class used to define roles. Defaults to owl:Class.
-        description_class (rdflib.URIRef, optional): Class used to define descriptions. Defaults to owl:Class.
-
-    Returns:
-        Ontology: Return the newly built collection of descriptions.
-    """
-    if type(graph) == str:
-      graph = rdflib.Graph().parse(graph)
-
-    ontology = cls() # create an empty description collection
-
-    # extract all the roles from ontology
-    for row in graph.query(cls.ROLES_QUERY.format(role_class=role_class)):
-      ontology.add(Element(str(row.role)))
-
-    # extract all the descriptions from the ontology
-    descriptions_query_results = graph.query(cls.DESCRIPTIONS_QUERY.format(
-      role_class=role_class,
-      description_class=description_class))
-    for row in descriptions_query_results:
-      ontology.add(Element(str(row.description)))
-
-    # add all the roles to each descriptions
-    for row in descriptions_query_results:
-      if str(row.description) in ontology and str(row.role) in ontology:
-        ontology[str(row.description)].add(ontology[str(row.role)])
-
-    # add the hierarchy
-    for row in graph.query(cls.HIERARCHY_QUERY.format(
-      role_class=role_class,
-      description_class=description_class)):
-      if str(row.element) in ontology and str(row.parent) in ontology:
-        element = ontology[str(row.element)]
-        parent = ontology[str(row.parent)]
-        element.add_parent(parent)
-        parent.add_child(element)
-
-    return ontology
-
-  def export(self, 
-             base_iri: rdflib.Namespace = rdflib.Namespace("http://w3id.org/sandra/exported/"),
-             role_class: str = "Role",
-             description_class: str = "Description",
-             property_name: str = "hasRole") -> rdflib.Graph:
     graph = rdflib.Graph()
+    graph.add((r_iri, rdflib.RDF.type, rdflib.OWL.ObjectProperty))
+    
+    for a in self.attributes:
+      name = quote_plus(a.name)
 
-    # munge iri for all the elements of the ontology
-    iris = {
-      el.name: base_iri[path.basename(urlparse(el.name).path)]
-      for el in self.elements
-    }
-
-    for role in self.roles:
-      # add to graph
-      graph.add((iris[role.name], rdflib.RDF.type, rdflib.OWL.Class))
-      graph.add((iris[role.name], rdflib.RDFS.subClassOf, base_iri[role_class]))
-
-    # add descriptions
-    for description in self.descriptions:
-      graph.add((iris[description.name], rdflib.RDF.type, rdflib.OWL.Class))
-      graph.add((iris[description.name], rdflib.RDFS.subClassOf, base_iri[description_class]))
-
-      # add all the existential restrictions
-      for component in description.components:
-        # build existential restriction axiom
-        restriction = rdflib.BNode()
-        graph.add((restriction, rdflib.RDF.type, rdflib.OWL.Restriction))
-        graph.add((restriction, rdflib.OWL.onProperty, base_iri[property_name]))
-        graph.add((restriction, rdflib.OWL.someValuesFrom, iris[component.name]))
-
-        # add it to the proper class
-        graph.add((iris[description.name], rdflib.RDFS.subClassOf, restriction))
+      graph.add((base_iri[name], rdflib.RDF.type, rdflib.OWL.Class))
+      graph.add((base_iri[name], rdflib.RDFS.subClassOf, attribute_iri))
 
     return graph
+    
+
+  @staticmethod
+  def from_graph(
+    graph: rdflib.Graph, 
+    attribute_iri: rdflib.URIRef | str = DEFAULT_ATTRIBUTE_IRI,
+    frame_iri: rdflib.URIRef | str = DEFAULT_FRAME_IRI,
+    r_iri: rdflib.URIRef | str = DEFAULT_COMPONENT_IRI):
+    hierarchy_query = "SELECT * WHERE {{ ?x rdfs:subClassOf* <{iri}> . FILTER (?x != <{iri}>). }}"
+    components_query = """
+    SELECT * WHERE {{ 
+      <{frame_iri}> rdfs:subClassOf [ 
+        owl:onProperty <{r_iri}> ; 
+        owl:someValuesFrom ?x ] .
+      FILTER (?x != <{iri}>). 
+    }}"""
+
+    # extract attributes
+    attributes = {
+      x: Attribute(name=str(x)) # TODO: strip iri
+      for x, *_ in graph.query(hierarchy_query.format(iri=attribute_iri))
+    }
+
+    # extract attribute hierarchy
+    attributes_parents = {
+      attribute: [attributes[i] for i in graph.objects(iri, rdflib.RDFS.subClassOf) if i in attributes]
+      for iri, attribute in attributes.items()
+    }
+
+    # extract frames
+    frames = {}
+    for iri, *_ in graph.query(hierarchy_query.format(iri=frame_iri)):
+      components = [
+        attributes[c]
+        for c, *_ in graph.query(components_query.format(frame_iri=iri, r_iri=r_iri, iri=frame_iri))
+      ] 
+
+      # TODO: strip iri
+      frames[iri] = Frame(str(iri), components=components)
+
+    # extract frames hierarchy
+    frames_parents = {
+      frame: [frames[i] for i in graph.objects(iri, rdflib.RDFS.subClassOf) if i in frames]
+      for iri, frame in frames.items()
+    }
+
+
+    return KnowledgeBase(
+      attributes=list(attributes.values()),
+      attributes_parents=attributes_parents,
+      frames=list(frames.values()),
+      frames_parents=frames_parents
+    )

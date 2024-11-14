@@ -2,13 +2,13 @@ from typing import List, Union, Tuple
 from functools import partial
 from math import log, pi, atan, exp
 
-from sandra.ontology import Ontology, Situation, Element
+from sandra.ontology import KnowledgeBase
+from functools import reduce
 
 import torch
 import torch.nn.functional as F
 
 import torch
-import pdb
 import torch.nn as nn
 import math
 from torch.autograd import Variable
@@ -40,145 +40,87 @@ class StraighThroughHeaviside(Function):
     grad = F.hardtanh(grad_output, -1.0, 1.0)
     return grad, None, None, None
 
+class StraighThroughGate(Function):
+  """
+  Implements the straight through heaviside using the gradient estimation
+  technique presented in [1].
 
-class ReasonerModule(torch.nn.Module):
-  def __init__(self, ontology: Ontology, device=torch.device("cpu")):
-    """
-    Initialise the reasoner.
+  [1] https://arxiv.org/abs/1308.3432
+  """
 
-    Args:
-        ontology (Ontology): Ontology containing roles and descriptions
-          used by the reasoner to classify situations.
-        epsilon (float, optional): Controls the degree of approximation of the smooth Heaviside 
-          according to the function defined in [1]. Defaults to 128.
-        device (optional): Device on which the reasoner module is loaded on. Defaults to cpu.
+  @staticmethod
+  def forward(input, t):
     """
+    During the forward pass the regular heaviside function is used.
+    The absolute value of the input values is considered. 
+    A threshold is defined to make sure that small values are replaced by 0.
+    """
+    mask = input > t
+
+    out = torch.zeros_like(input)
+    out[mask] = 1.0
+    
+    return out
+
+  @staticmethod
+  def setup_context(ctx, inputs, output):
+    input, t = inputs
+    ctx.t = t
+        
+  @staticmethod
+  def backward(ctx, grad_output):
+    """
+    During the backward pass, the gradient of the heaviside
+    is approximated by simply copying the input gradients.
+    """
+    grad = F.hardtanh(grad_output, -1.0, 1.0)
+    return grad, None
+
+class ReasonerModule(nn.Module):
+  def __init__(self, kb: KnowledgeBase, device: str = "cpu", t: float = 0.01):
     super().__init__()
-    self.device = device
-    self.ontology = ontology
-
-    # cache encodings for faster execution
-    self.__phi_cache = {}
-    self.__encoding = {}
+    self.kb = kb
+    self.t = t
     
-    # compute the basis that spans the whole space by constructing
-    # a matrix where the column are the encoding of each element
-    self.basis = torch.stack([self.encode(e) for e in self.ontology.roles])
-    self.basis = F.normalize(self.basis)
-
-    self.description_mask = torch.zeros((len(self.ontology.descriptions), len(self.ontology.roles)))
-    for d_idx, d in enumerate(self.ontology.descriptions):
-      self.description_mask[d_idx, self.description_element_idxs(d)] = 1
-      
-    self.description_card = torch.tensor([len(d.components) for d in self.ontology.descriptions])
-        
-  def description_element_idxs(self, d: Element) -> torch.tensor:
-    """
-    Compute the indeces of the bases corresponding to element in the description.
-
-    Args:
-        d (Element): Input description.
-
-    Returns:
-        torch.tensor: Elements' bases
-    """
-    idxs = set()
-    for e in d.components:
-      idxs.add(self.ontology.roles.index(e))
+    # sorted attributes
+    self._ordered_attrs = sorted(set(self.kb.attributes))
     
-    return torch.tensor(list(idxs))
+    # one-hot-encode auf
+    self._onehot_attrs = torch.eye(len(self._ordered_attrs))
 
-  def phi(self, x: Element) -> torch.Tensor:
-    """
-    Computes phi for an element.
-
-    Args:
-        x (Element): Element to encode
-    Returns:
-        torch.Tensor: Vector of length (|C| + |D|) representing the encoded.
-    """
-    if x.name not in self.__phi_cache:
-      encoding = torch.Tensor([
-        1 if x == y or y in x.descendants() else 0 
-        for y in self.ontology.roles])
-      self.__phi_cache[x.name] = encoding
-    else:
-      encoding = self.__phi_cache[x.name]
+    # incorporate hierarchies
+    self._encoded_attrs = torch.zeros_like(self._onehot_attrs)
+    for i, x in enumerate(self._ordered_attrs):
+      x_elements = self._onehot_attrs[[i] + [self._ordered_attrs.index(p) for p in self.kb.parents(x)]]
+      self._encoded_attrs[i] = reduce(torch.logical_or, x_elements).to(self._encoded_attrs.dtype)
     
-    return encoding
+    # normalize the encodings
+    self._encoded_attr = F.normalize(self._encoded_attrs, dim=1)
 
-  def encode_element(self, d: Element) -> torch.Tensor:
-    """
-    Encode the provided element.
-    
-    Args:
-        e (Element): The element that will be encoded.
-    Returns:
-        np.Tensor: Vector of length (|C| + |D|) representing the encoded element.
-    """
-    if d.name in self.__encoding:
-      encoding = self.__encoding[d.name]
-    else:
-      encoding = self.phi(d) + (0 if len(d.components) == 0 else torch.vstack([self.encode_element(r) for r in d.components]).sum(axis=0))
-      self.__encoding[d.name] = encoding
-    return encoding
-  
-  def encode_situation(self, s: Situation) -> torch.tensor:
-    """
-    Encode the provided situation.
+    # compute the frame encodings
+    # to guarantee computational efficiency, a boolean matrix is used to keep track
+    # of which component belong to which frame
+    self._frame_gate = torch.zeros((len(self.kb.frames), len(self._ordered_attrs)))
+    for i, f in enumerate(self.kb.frames):
+      components_idxs = [self._ordered_attrs.index(c) for c in f.components]
+      self._frame_gate[i, components_idxs] = 1.0
+    self._frame_card = self._frame_gate.sum(dim=1)
 
-    Args:
-        s (Situation): The situation that will be encoded.
-    Returns:
-        torch.tensor: Tensor of length (|C| + |D|) representing the encoded situation.
-    """
-    return torch.stack([self.encode(c) for c in s.individuals]).sum(dim=0)
-
-  def encode(self, x: Union[Situation, Element]) -> torch.tensor:
-    """
-    Encode the input by relying on description or element encoding.
-
-    Args:
-        x (Union[Situation, Element]): Element to be encoded.
-
-    Raises:
-        ValueError: Error raised if x is not a situation or a description.
-
-    Returns:
-        torch.tensor: The input encoded as a tensor.
-    """
-    if type(x) == Situation:
-      return self.encode_situation(x)
-    elif type(x) == Element:
-      return self.encode_element(x)
-    else:
-      raise ValueError(f"{e} is not of type Situation or Description")
-  
-  def forward(self, x: torch.tensor) -> torch.tensor:
-    """
-    Infer the descriptions that are satisfied by the encoded situation x.
-
-    Args:
-        x (torch.tensor): Situation array taken as input.
-        
-    Returns:
-        torch.tensor: Array containing the distance between the input situation
-          and each description. If distance is 0 then the description is
-          completely satisfied.
-    """
-    if self.basis.device != self.device:
-      self.basis = self.basis.to(self.device)
-      self.description_card = self.description_card.to(self.device)
-      self.description_mask = self.description_mask.to(self.device)
-      
-    # turn x into batched if it is not
+  def forward(self, x):
     x = torch.atleast_2d(x)
-    x = F.normalize(x)
 
-    # in order to satisfy a description, a situation must be expressed
-    # as a linear combination of the basis of such description
-    # we check whether the situation is orthogonal to each basis
-    orthogonality = StraighThroughHeaviside.apply(x @ self.basis.T) @ self.description_mask.T
-    satisfied = orthogonality / self.description_card
+    # normalize x
+    x = F.normalize(x, dim=1)
 
-    return satisfied
+    # retrieve attributes
+    attrs = torch.einsum("bf,af->ba", x, self._encoded_attr)
+
+    # piece-wise function
+    # TODO: modularize this with tollerance
+    inf = StraighThroughGate.apply(attrs, self.t)
+
+    # aggregate frame-wise and normalize by number of elements in a frame
+    inf = torch.einsum("ba,fa->bf", inf, self._frame_gate)
+    inf = (inf + 1e-10) / (self._frame_card + 1e-10)
+
+    return inf
